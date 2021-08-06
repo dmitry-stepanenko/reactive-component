@@ -1,0 +1,55 @@
+<div class="example-container mat-elevation-z8" *ngIf="pageData$ | async as pageData">
+    <ng-container *ngIf="!pageData.showNoResults; else noResultsTpl">
+      <div class="example-loading-shade" *ngIf="pageData.showLoading">
+        <mat-spinner></mat-spinner>
+      </div>
+
+      <form class="filters" [formGroup]="filterForm" *ngIf="pageData.formDataLoaded">
+        <mat-form-field>
+          <input matInput placeholder="Search" formControlName="searchText">
+        </mat-form-field>
+        <mat-select placeholder="Inventory Type" formControlName="inventory_type">
+          <mat-option [value]="null">Все</mat-option>
+          <mat-option *ngFor="let item of pageData.inventoryTypes" [value]="item.type">
+            {{item.displayed_name}}
+          </mat-option>
+        </mat-select>
+      </form>
+    
+      <div class="example-table-container">
+    
+        <table mat-table [dataSource]="pageData.products" class="example-table"
+               matSort matSortActive="created" matSortDisableClear matSortDirection="desc">
+
+          <!-- inventory_id Column -->
+          <ng-container matColumnDef="inventory_id">
+            <th mat-header-cell *matHeaderCellDef>#</th>
+            <td mat-cell *matCellDef="let row">{{row.inventory_id}}</td>
+          </ng-container>
+    
+          <!-- Name Column -->
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let row">{{row.name}}</td>
+          </ng-container>
+    
+          <!-- inventory_number Column -->
+          <ng-container matColumnDef="inventory_number">
+            <th mat-header-cell *matHeaderCellDef>Inventory Type</th>
+            <td mat-cell *matCellDef="let row">{{pageData.inventoryTypesMap.get(row.inventory_type)}}</td>
+          </ng-container>
+    
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+      </div>
+    
+      <mat-paginator [length]="pageData.totalCount" [pageSize]="10" (page)="pageChanged($event)"></mat-paginator>
+    </ng-container>
+  </div>
+    
+
+  <ng-template #noResultsTpl>
+    <div>Oops, looks like there're no results!</div>
+  </ng-template>
+  
