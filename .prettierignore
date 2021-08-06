@@ -1,0 +1,7 @@
+# Add files here to ignore them from prettier formatting
+
+/dist
+/coverage
+
+# these files are autogenereated and there's no point in taking the time to format them
+/**/*.graphql.ts
