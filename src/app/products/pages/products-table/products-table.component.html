@@ -1,25 +1,27 @@
-<div class="example-container mat-elevation-z8" *ngIf="pageData$ | async as pageData">
-    <ng-container *ngIf="!pageData.showNoResults; else noResultsTpl">
-      <div class="example-loading-shade" *ngIf="pageData.showLoading">
+<div class="example-container mat-elevation-z8">
+  <div *ngIf="productsInitiallyLoaded$ | async">
+    <div *ngIf="(showNoResults$ | async) === false">
+      <div class="example-loading-shade" *ngIf="showLoading$ | async">
         <mat-spinner></mat-spinner>
       </div>
 
-      <form class="filters" [formGroup]="filterForm" *ngIf="pageData.formDataLoaded">
+      <form class="filters" [formGroup]="filterForm" *ngIf="inventoryTypesLoaded$ | async">
         <mat-form-field>
-          <input matInput placeholder="Search" formControlName="searchText">
+          <input matInput placeholder="Поиск" formControlName="searchText">
         </mat-form-field>
-        <mat-select placeholder="Inventory Type" formControlName="inventory_type">
+        <mat-select placeholder="Тип" formControlName="inventory_type">
           <mat-option [value]="null">Все</mat-option>
-          <mat-option *ngFor="let item of pageData.inventoryTypes" [value]="item.type">
+          <mat-option *ngFor="let item of inventoryTypes" [value]="item.type">
             {{item.displayed_name}}
           </mat-option>
         </mat-select>
       </form>
+    </div>
+    <div *ngIf="showTable$ | async">
+      <div class="example-table-container" *ngIf="productsInitiallyLoaded$ | async">
     
-      <div class="example-table-container">
-    
-        <table mat-table [dataSource]="pageData.products" class="example-table"
-               matSort matSortActive="created" matSortDisableClear matSortDirection="desc">
+        <table mat-table [dataSource]="(products$ | async)!" class="example-table"
+                matSort matSortActive="created" matSortDisableClear matSortDirection="desc">
 
           <!-- inventory_id Column -->
           <ng-container matColumnDef="inventory_id">
@@ -29,14 +31,14 @@
     
           <!-- Name Column -->
           <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <th mat-header-cell *matHeaderCellDef>Имя</th>
             <td mat-cell *matCellDef="let row">{{row.name}}</td>
           </ng-container>
     
           <!-- inventory_number Column -->
           <ng-container matColumnDef="inventory_number">
-            <th mat-header-cell *matHeaderCellDef>Inventory Type</th>
-            <td mat-cell *matCellDef="let row">{{pageData.inventoryTypesMap.get(row.inventory_type)}}</td>
+            <th mat-header-cell *matHeaderCellDef>Тип</th>
+            <td mat-cell *matCellDef="let row">{{getInventoryType(row.inventory_type)}}</td>
           </ng-container>
     
           <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
@@ -44,12 +46,19 @@
         </table>
       </div>
     
-      <mat-paginator [length]="pageData.totalCount" [pageSize]="10" (page)="pageChanged($event)"></mat-paginator>
-    </ng-container>
+      <mat-paginator [length]="totalCount$ | async" [pageSize]="10" (page)="pageChanged($event)"></mat-paginator>
+    </div>
+    <div *ngIf="showNoResults$ | async" class="no-results">
+      <div>Похоже, ни одного продукта еще не было добавлено</div>
+    </div>
+    <div *ngIf="showNoSearchResults$ | async" class="no-results">
+      <div>Похоже, по заданным критерием поиска нету результатов</div>
+    </div>
   </div>
+  <div *ngIf="(productsInitiallyLoaded$ | async) === false">
+    Загрузка..
+  </div>
+</div>
     
 
-  <ng-template #noResultsTpl>
-    <div>Oops, looks like there're no results!</div>
-  </ng-template>
   

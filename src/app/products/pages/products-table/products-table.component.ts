@@ -1,11 +1,10 @@
-import { Component, ChangeDetectionStrategy, ViewChild, OnDestroy, AfterViewInit } from '@angular/core';
-import { MatPaginator, PageEvent } from '@angular/material/paginator';
-import { combineLatest, Subject } from 'rxjs';
+import { Component, ChangeDetectionStrategy, AfterViewInit } from '@angular/core';
+import { PageEvent } from '@angular/material/paginator';
+import { combineLatest, Observable } from 'rxjs';
 import { ProductsFacade } from '../../+state/products.facade';
-import { InventoryTypeItem, Product, ProductsFilter } from '../../models/products.models';
-import { filter, map, startWith, switchMapTo, takeUntil } from 'rxjs/operators';
-import { FormBuilder, FormGroup } from '@angular/forms';
-import { Observable } from 'rxjs';
+import { InventoryTypeItem, ProductsFilter } from '../../models/products.models';
+import { map, startWith } from 'rxjs/operators';
+import { FormBuilder } from '@angular/forms';
 
 @Component({
   selector: 'app-products-table',
@@ -14,99 +13,64 @@ import { Observable } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ProductsFacade],
 })
-export class ProductsTableComponent implements AfterViewInit, OnDestroy {
+export class ProductsTableComponent implements AfterViewInit {
   readonly displayedColumns: string[] = ['inventory_id', 'name', 'inventory_number'];
 
-  readonly filterForm: FormGroup = this.getFilterForm();
-  readonly pageData$: Observable<PageData> = this.getPageData();
+  readonly filterForm = this.fb.group({
+    searchText: null,
+    inventory_type: null,
+  });
 
-  private readonly onDestroy$ = new Subject<void>();
+  products$ = this.productsFacade.products$;
+  productsInitiallyLoaded$ = this.productsFacade.productsInitiallyLoaded$;
+  showLoading$ = combineLatest([
+    this.productsFacade.inventoryTypesLoaded$, 
+    this.productsFacade.productsLoaded$
+  ]).pipe(
+    map(loaded => !loaded.every(Boolean))
+  );
+  totalCount$ = this.productsFacade.totalCount$;
+  showNoResults$: Observable<boolean>
+  showNoSearchResults$: Observable<boolean>;
+  showTable$: Observable<boolean>
+  inventoryTypesLoaded$ = this.productsFacade.inventoryTypesLoaded$;
+  inventoryTypes: InventoryTypeItem[] = [];
+
+  
+
+  get isFilterApplied() {
+    return !this.filterForm.value.searchText && !this.filterForm.value.inventory_type;
+  }
 
   constructor(private productsFacade: ProductsFacade, private fb: FormBuilder) {
+    const data$ = combineLatest([
+      this.productsInitiallyLoaded$, 
+      this.totalCount$,
+      this.filterForm.valueChanges.pipe(startWith(this.filterForm.value))
+    ]);
+    this.showNoResults$ = data$.pipe(map(([loaded, count, filterValue]) => loaded && !count && !Object.values(filterValue).some(Boolean)));
+    this.showNoSearchResults$ = data$.pipe(map(([loaded, count, filterValue]) => loaded && !count && Object.values(filterValue).some(Boolean)));
+    this.showTable$ = combineLatest([this.showNoResults$, this.showNoSearchResults$]).pipe(map(([noResults, noSearchResults]) => !noResults && !noSearchResults));
     this.productsFacade.getProducts();
     this.productsFacade.loadInventoryTypes();
   }
 
   ngAfterViewInit(): void {
-    this.setupSubscriptions();
-  }
-
-  ngOnDestroy(): void {
-    this.onDestroy$.next();
+    this.filterForm.valueChanges.subscribe((formValue: ProductsFilter) => {
+      this.productsFacade.setFilters(formValue);
+    });
+    this.productsFacade.inventoryTypes$
+      .subscribe(inventoryTypes => this.inventoryTypes = inventoryTypes) 
   }
 
   pageChanged(event: PageEvent) {
     this.productsFacade.setPager({ offset: event.pageSize * event.pageIndex, count: event.pageSize });
   }
 
-  private getPageData(): Observable<PageData> {
-    const productsLoaded$: Observable<boolean> = combineLatest([
-      this.productsFacade.productsInitiallyLoaded$,
-      this.productsFacade.productsLoaded$,
-    ]).pipe(map((loaded) => loaded.every(Boolean)));
-
-    const inventoryTypesMap$ = this.productsFacade.inventoryTypesLoaded$.pipe(
-      filter(Boolean),
-      switchMapTo(this.productsFacade.inventoryTypes$),
-      map((inventoryTypes) => new Map(inventoryTypes.map((e) => [e.type, e.displayed_name])))
-    );
-
-    const part1$ = combineLatest([
-      productsLoaded$,
-      this.productsFacade.products$,
-      this.productsFacade.totalCount$,
-      this.filterForm.valueChanges.pipe(startWith(this.filterForm.value)), // убрать startWith и спросить, почему не работает
-      this.productsFacade.inventoryTypesLoaded$,
-    ]).pipe(
-      map(([productsLoaded, products, totalCount, filterValue, inventoryTypesLoaded ]) => {
-        const isFilterApplied = Object.values(filterValue).some(Boolean);
-        return {
-          showLoading: !productsLoaded || !inventoryTypesLoaded,
-          formDataLoaded: inventoryTypesLoaded,
-          showNoResults: productsLoaded && !products.length && !isFilterApplied,
-          products,
-          totalCount,
-        };
-      })
-    );
-
-    const part2$ = combineLatest([
-      this.productsFacade.inventoryTypes$,
-      inventoryTypesMap$,
-    ]).pipe(
-      map(([inventoryTypes, inventoryTypesMap]) => ({
-        inventoryTypes,
-        inventoryTypesMap,
-      }))
-    );
-
-    return combineLatest([part1$, part2$]).pipe(
-      map(([part1, part2]) => ({...part1, ...part2}))
-    )
+  getInventoryType(type: string) {
+    return this.inventoryTypes.find(e => e.type === type)?.displayed_name;
   }
 
-  private getFilterForm(): FormGroup {
-    return this.fb.group({
-      searchText: null,
-      inventory_type: null,
-    });
-  }
-
-  private setupSubscriptions() {
-    this.filterForm.valueChanges.pipe(takeUntil(this.onDestroy$)).subscribe((formValue: ProductsFilter) => {
-      this.productsFacade.setFilters(formValue);
-    });
-  }
-}
-
-interface PageData {
-  products: Product[];
-  totalCount: number;
-  showNoResults: boolean;
-  formDataLoaded: boolean;
-  showLoading: boolean;
-  inventoryTypesMap: Map<InventoryTypeItem['type'], InventoryTypeItem['displayed_name']>;
-  inventoryTypes: InventoryTypeItem[]
 }
 
 /* 

@@ -27,9 +27,6 @@ export class ProductsFacade {
   readonly inventoryTypesLoaded$ = this._inventoryTypesLoaded$.asObservable();
 
   getProducts(): void {
-    if (this.pager.offset !== 0) {
-      this._productsInitiallyLoaded$.next(false);
-    }
     this._productsLoaded$.next(false);
     setTimeout(() => {
       let result = PRODUCTS_DATA.filter(
@@ -45,7 +42,7 @@ export class ProductsFacade {
       this._totalCount$.next(result.length);
       this._productsLoaded$.next(true);
       this._productsInitiallyLoaded$.next(true);
-    }, 300);
+    }, this._productsInitiallyLoaded$.value ? 300 : 3000);
   }
 
   loadInventoryTypes() {
